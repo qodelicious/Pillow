@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from PIL import Image
 
 from .helper import hopper
@@ -25,3 +27,11 @@ def test_true_16() -> None:
         assert im.mode == "I;16"
         extrema = im.getextrema()
     assert extrema == (106, 285)
+
+
+@pytest.mark.parametrize("mode", ("I;16", "I;16L", "I;16B", "I;16N"))
+def test_i16_modes(mode: str) -> None:
+    im = Image.new(mode, (3, 1))
+    im.putdata([258, 65535, 4])
+
+    assert im.getextrema() == (4, 65535)

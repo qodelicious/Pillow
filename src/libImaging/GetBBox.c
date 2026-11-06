@@ -260,38 +260,37 @@ ImagingGetExtrema(Imaging im, void *extrema) {
             memcpy(extrema, &fmin, sizeof(fmin));
             memcpy(((char *)extrema) + sizeof(fmin), &fmax, sizeof(fmax));
             break;
-        case IMAGING_TYPE_I16:
-            if (im->mode == IMAGING_MODE_I_16) {
-                UINT16 v;
-                UINT8 *pixel = *im->image8;
+        case IMAGING_TYPE_I16: {
+            UINT16 v;
+            UINT8 *pixel;
+            /* I;16B, and I;16N on big endian platforms, store the high byte first */
+            int bigendian = im->mode == IMAGING_MODE_I_16B;
 #ifdef WORDS_BIGENDIAN
-                v = pixel[0] + ((UINT16)pixel[1] << 8);
-#else
-                memcpy(&v, pixel, sizeof(v));
+            bigendian = bigendian || im->mode == IMAGING_MODE_I_16N;
 #endif
-                imin = imax = v;
-                for (y = 0; y < im->ysize; y++) {
-                    for (x = 0; x < im->xsize; x++) {
-                        pixel = (UINT8 *)im->image[y] + x * sizeof(v);
-#ifdef WORDS_BIGENDIAN
-                        v = pixel[0] + ((UINT16)pixel[1] << 8);
-#else
-                        memcpy(&v, pixel, sizeof(v));
-#endif
-                        if (imin > v) {
-                            imin = v;
-                        } else if (imax < v) {
-                            imax = v;
-                        }
+#define I16_VALUE(p) \
+    (bigendian ? ((UINT16)(p)[0] << 8) + (p)[1] : (p)[0] + ((UINT16)(p)[1] << 8))
+            pixel = *im->image8;
+            v = I16_VALUE(pixel);
+            imin = imax = v;
+            for (y = 0; y < im->ysize; y++) {
+                for (x = 0; x < im->xsize; x++) {
+                    pixel = (UINT8 *)im->image[y] + x * sizeof(v);
+                    v = I16_VALUE(pixel);
+                    if (imin > v) {
+                        imin = v;
+                    } else if (imax < v) {
+                        imax = v;
                     }
                 }
-                v = (UINT16)imin;
-                memcpy(extrema, &v, sizeof(v));
-                v = (UINT16)imax;
-                memcpy(((char *)extrema) + sizeof(v), &v, sizeof(v));
-                break;
             }
-            /* FALL THROUGH */
+#undef I16_VALUE
+            v = (UINT16)imin;
+            memcpy(extrema, &v, sizeof(v));
+            v = (UINT16)imax;
+            memcpy(((char *)extrema) + sizeof(v), &v, sizeof(v));
+            break;
+        }
         default:
             (void)ImagingError_ModeError();
             return -1;
